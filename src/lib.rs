@@ -3,7 +3,7 @@ use conquer_once::Lazy;
 use glob::MatchOptions;
 use regex::{Captures, Regex, Replacer};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 
 fn is_need_csv(name: &str) -> bool {
@@ -20,6 +20,12 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
     let file = std::fs::File::open(path)?;
 
     let mut file = BufReader::with_capacity(8196, file);
+    let mut buf = [0u8; 3];
+    file.read_exact(&mut buf)?;
+    if buf[0] != 0xEF || buf[1] != 0xBB && buf[2] != 0xBF {
+        log::error!("Can't find BOM in {} skip it", path.display());
+        return Ok(ret);
+    }
     let mut buf = String::with_capacity(1024);
 
     loop {
@@ -27,21 +33,29 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
         if len == 0 {
             break;
         }
-        let line = &buf[..len];
-        let line = line.trim();
+        let mut line = buf.trim();
+        log::debug!("line: [{}]", line);
+
+        match line.find(';') {
+            Some(comment) => line = line.split_at(comment).0,
+            _ => {},
+        }
 
         if line.is_empty() {
             continue;
         }
 
         let at = line.find(',').unwrap();
-        let (num, left) = line.split_at(at);
-        let (name, _) = match left.find(';') {
-            Some(semi) => left.split_at(semi),
-            None => (left, ""),
-        };
+        log::debug!("line: [{}]", line);
+        let (num, name) = line.split_at(at);
+        log::debug!("num: [{}]", num);
 
-        let name = &name[1..];
+        let mut name = &name[1..];
+
+        match name.find(",") {
+            Some(pos) => name = &name[..pos],
+            _ => {}
+        }
 
         ret.insert(num.parse()?, name.into());
         buf.clear();
@@ -122,7 +136,7 @@ pub fn convert(path: &Path) -> Result<()> {
     let csv = CsvInfo::new(path)?;
 
     for erb in glob::glob_with(
-        path.join("ERB").join("*.ERB").to_str().unwrap(),
+        path.join("ERB").join("**").join("*.ERB").to_str().unwrap(),
         MatchOptions {
             case_sensitive: false,
             ..Default::default()
