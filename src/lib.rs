@@ -3,9 +3,10 @@ use conquer_once::Lazy;
 use glob::MatchOptions;
 use regex::{Captures, Regex, Replacer};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read, Write, BufWriter};
 use std::path::{Path, PathBuf};
 use rayon::prelude::*;
+use std::fs::File;
 
 fn is_need_csv(name: &str) -> bool {
     match name {
@@ -15,6 +16,8 @@ fn is_need_csv(name: &str) -> bool {
     }
 }
 
+const BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+
 fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
     let mut ret = HashMap::new();
 
@@ -23,8 +26,8 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
     let mut file = BufReader::with_capacity(8196, file);
     let mut buf = [0u8; 3];
     file.read_exact(&mut buf)?;
-    if buf[0] != 0xEF || buf[1] != 0xBB && buf[2] != 0xBF {
-        log::error!("Can't find BOM in {} skip it", path.display());
+    if buf != BOM {
+        log::warn!("Can't find BOM in {} skip it", path.display());
         return Ok(ret);
     }
     let mut buf = String::with_capacity(1024);
@@ -142,8 +145,9 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     let ret = VAR_REGEX.replace_all(&erb, csv);
     let ret = USELESS_NAME.replace_all(ret.as_ref(), "$1");
 
-    std::fs::write(path, ret.as_ref())?;
-
+    let mut file = BufWriter::with_capacity(8196, File::create(path)?);
+    file.write_all(&BOM)?;
+    file.write_all(ret.as_bytes())?;
     Ok(())
 }
 
