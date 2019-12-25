@@ -110,6 +110,7 @@ impl<'a> Replacer for &'a CsvInfo {
             "EXPLV" => "EXP",
             "PALAMLV" => "PALAM",
             "UP" | "DOWM" => "SOURCE",
+            "UPBASE" | "DOWNBASE" => "BASE",
             var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
             var => var,
         }) {
