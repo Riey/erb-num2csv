@@ -18,15 +18,19 @@ fn is_need_csv(name: &str) -> bool {
 
 const BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
+fn check_bom(r: &mut impl Read) -> Result<bool> {
+    let mut buf = [0u8; BOM.len()];
+    r.read_exact(&mut buf)?;
+    Ok(buf == BOM)
+}
+
 fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
     let mut ret = HashMap::new();
 
     let file = std::fs::File::open(path)?;
 
     let mut file = BufReader::with_capacity(8196, file);
-    let mut buf = [0u8; 3];
-    file.read_exact(&mut buf)?;
-    if buf != BOM {
+    if !check_bom(&mut file)? {
         log::warn!("Can't find BOM in {} skip it", path.display());
         return Ok(ret);
     }
@@ -140,6 +144,12 @@ static USELESS_NAME: Lazy<Regex> = Lazy::new(|| Regex::new("%.+?NAME:([^\\d]+?)%
 
 pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
+    let mut file = BufReader::with_capacity(8196, File::open(path)?);
+
+    if !check_bom(&mut file)? {
+        log::warn!("Can't find BOM in {} skip it", path.display());
+        return Ok(());
+    }
     let erb = std::fs::read_to_string(path)?;
 
     let ret = VAR_REGEX.replace_all(&erb, csv);
