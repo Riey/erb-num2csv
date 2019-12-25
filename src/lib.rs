@@ -39,6 +39,7 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
     loop {
         let len = file.read_line(&mut buf)?;
         if len == 0 {
+            buf.clear();
             break;
         }
         let mut line = buf.trim();
@@ -50,6 +51,7 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
         }
 
         if line.is_empty() {
+            buf.clear();
             continue;
         }
 
