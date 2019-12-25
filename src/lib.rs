@@ -106,9 +106,15 @@ impl<'a> Replacer for &'a CsvInfo {
         let start = all.start();
         let all = all.as_str();
         let var = caps.get(1).unwrap();
-        match self.dic.get(var.as_str()) {
+        if var.as_str().ends_with("NAME") {
+            log::debug!("check NAME, var: {}", var.as_str());
+        }
+        match self.dic.get(match var.as_str() {
+            var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
+            var => var,
+        }) {
             Some(dic) => {
-                let idx = caps.get(2).unwrap();
+                let idx = caps.get(3).unwrap();
                 dst.push_str(&all[..idx.start() - start]);
                 let idx = idx.as_str();
                 dst.push_str(
@@ -116,6 +122,7 @@ impl<'a> Replacer for &'a CsvInfo {
                         .map(|v| v.as_str())
                         .unwrap_or(idx),
                 );
+                log::debug!("all: {}, var: [{}]", all, var.as_str());
             }
             None => {
                 dst.push_str(all);
@@ -124,13 +131,15 @@ impl<'a> Replacer for &'a CsvInfo {
     }
 }
 
-static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^({:]+):[^:]+:(\\d+)").unwrap());
+static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^(){\\[%: ]+)(:[^ :]+)?:(\\d+)").unwrap());
+static USELESS_NAME: Lazy<Regex> = Lazy::new(|| Regex::new("%.+?NAME:([^\\d]+?)%").unwrap());
 
 pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
     let erb = std::fs::read_to_string(path)?;
 
     let ret = VAR_REGEX.replace_all(&erb, csv);
+    let ret = USELESS_NAME.replace_all(ret.as_ref(), "$1");
 
     std::fs::write(path, ret.as_ref())?;
 
