@@ -142,7 +142,7 @@ impl<'a> Replacer for &'a CsvInfo {
 }
 
 static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^(){\\[%: ]+)(:[^ :]+)?:(\\d+)").unwrap());
-static USELESS_NAME: Lazy<Regex> = Lazy::new(|| Regex::new("%.+?NAME:([^\\d]+?)%").unwrap());
+static USELESS_NAME: Lazy<Regex> = Lazy::new(|| Regex::new("%(ABL|TALENT|EXP|MARK|PALAM)NAME:([^\\d]+?)%").unwrap());
 
 pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
@@ -155,7 +155,7 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     let erb = std::fs::read_to_string(path)?;
 
     let ret = VAR_REGEX.replace_all(&erb, csv);
-    let ret = USELESS_NAME.replace_all(ret.as_ref(), "$1");
+    let ret = USELESS_NAME.replace_all(ret.as_ref(), "$2");
 
     let mut file = BufWriter::with_capacity(8196, File::create(path)?);
     file.write_all(&BOM)?;
