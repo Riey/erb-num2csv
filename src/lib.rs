@@ -1,12 +1,12 @@
 use anyhow::Result;
 use conquer_once::Lazy;
 use glob::MatchOptions;
+use rayon::prelude::*;
 use regex::{Captures, Regex, Replacer};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write, BufWriter};
-use std::path::{Path, PathBuf};
-use rayon::prelude::*;
 use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::path::{Path, PathBuf};
 
 fn is_need_csv(name: &str) -> bool {
     match name {
@@ -47,7 +47,7 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
 
         match line.find(';') {
             Some(comment) => line = line.split_at(comment).0,
-            _ => {},
+            _ => {}
         }
 
         if line.is_empty() {
@@ -87,7 +87,7 @@ impl CsvInfo {
                 ..Default::default()
             },
         )?
-            .filter_map(|csv| {
+        .filter_map(|csv| {
             csv.ok().and_then(|csv| {
                 let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
 
@@ -97,12 +97,12 @@ impl CsvInfo {
                     None
                 }
             })
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
-        let dic = files.into_par_iter()
-            .filter_map(|(name, csv)| {
-                parse_csv(&csv).ok().map(|info| (name, info))
-            })
+        let dic = files
+            .into_par_iter()
+            .filter_map(|(name, csv)| parse_csv(&csv).ok().map(|info| (name, info)))
             .collect();
 
         Ok(Self { dic })
@@ -141,8 +141,10 @@ impl<'a> Replacer for &'a CsvInfo {
     }
 }
 
-static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^(){\\[%: ]+)(:[^ :]+)?:(\\d+)").unwrap());
-static USELESS_NAME: Lazy<Regex> = Lazy::new(|| Regex::new("%(ABL|TALENT|EXP|MARK|PALAM)NAME:([^\\d]+?)%").unwrap());
+static VAR_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new("([^(){\\[%: ]+)(:[^ :]+)?:(\\d+)").unwrap());
+static USELESS_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new("%(ABL|TALENT|EXP|MARK|PALAM)NAME:([^\\d]+?)%").unwrap());
 
 pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
@@ -167,22 +169,21 @@ pub fn convert(path: &Path) -> Result<()> {
     log::debug!("Start in {:?}", path);
     let csv = CsvInfo::new(path)?;
 
-    let erb_files= glob::glob_with(
+    let erb_files = glob::glob_with(
         path.join("ERB").join("**").join("*.ERB").to_str().unwrap(),
         MatchOptions {
             case_sensitive: false,
             ..Default::default()
         },
-    )?.filter_map(|erb| {
-        erb.ok()
-    }).collect::<Vec<_>>();
+    )?
+    .filter_map(|erb| erb.ok())
+    .collect::<Vec<_>>();
 
-    erb_files.into_par_iter()
-        .for_each_with(&csv, |csv, erb| {
-            if let Err(err) = convert_erb(&erb, &csv) {
-                log::error!("convert erb {} failed: {:?}", erb.display(), err);
-            }
-        });
+    erb_files.into_par_iter().for_each_with(&csv, |csv, erb| {
+        if let Err(err) = convert_erb(&erb, &csv) {
+            log::error!("convert erb {} failed: {:?}", erb.display(), err);
+        }
+    });
 
     Ok(())
 }
