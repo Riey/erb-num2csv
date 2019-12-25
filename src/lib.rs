@@ -106,10 +106,10 @@ impl<'a> Replacer for &'a CsvInfo {
         let start = all.start();
         let all = all.as_str();
         let var = caps.get(1).unwrap();
-        if var.as_str().ends_with("NAME") {
-            log::debug!("check NAME, var: {}", var.as_str());
-        }
         match self.dic.get(match var.as_str() {
+            "EXPLV" => "EXP",
+            "PALAMLV" => "PALAM",
+            "UP" | "DOWM" => "SOURCE",
             var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
             var => var,
         }) {
