@@ -4,7 +4,7 @@ use glob::MatchOptions;
 use regex::{Captures, Regex, Replacer};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
-use std::path::{PathBuf, Path};
+use std::path::{Path, PathBuf};
 
 fn is_need_csv(name: &str) -> bool {
     match name {
@@ -41,6 +41,8 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
             None => (left, ""),
         };
 
+        let name = &name[1..];
+
         ret.insert(num.parse()?, name.into());
         buf.clear();
     }
@@ -56,7 +58,7 @@ impl CsvInfo {
     pub fn new(path: &Path) -> Result<Self> {
         let mut dic = HashMap::new();
         for csv in glob::glob_with(
-            &(path.to_str().unwrap().to_string() + "csv/*.csv"),
+            path.join("CSV").join("*.CSV").to_str().unwrap(),
             MatchOptions {
                 case_sensitive: false,
                 ..Default::default()
@@ -72,18 +74,22 @@ impl CsvInfo {
             }
         }
 
+        log::debug!("dic: {:?}", dic);
+
         Ok(Self { dic })
     }
 }
 
 impl<'a> Replacer for &'a CsvInfo {
     fn replace_append(&mut self, caps: &Captures, dst: &mut String) {
-        let all = caps.get(0).unwrap().as_str();
+        let all = caps.get(0).unwrap();
+        let start = all.start();
+        let all = all.as_str();
         let var = caps.get(1).unwrap();
         match self.dic.get(var.as_str()) {
             Some(dic) => {
                 let idx = caps.get(2).unwrap();
-                dst.push_str(&all[..idx.start()]);
+                dst.push_str(&all[..idx.start() - start]);
                 let idx = idx.as_str();
                 dst.push_str(
                     dic.get(&idx.parse().unwrap())
@@ -98,9 +104,10 @@ impl<'a> Replacer for &'a CsvInfo {
     }
 }
 
-static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^:]+):[^:]+:(\\d+)").unwrap());
+static VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new("([^({:]+):[^:]+:(\\d+)").unwrap());
 
 pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
+    log::debug!("Start convert erb path: {}", path.display());
     let erb = std::fs::read_to_string(path)?;
 
     let ret = VAR_REGEX.replace_all(&erb, csv);
@@ -111,10 +118,11 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
 }
 
 pub fn convert(path: &Path) -> Result<()> {
+    log::debug!("Start in {:?}", path);
     let csv = CsvInfo::new(path)?;
 
     for erb in glob::glob_with(
-        "erb/*.erb",
+        path.join("ERB").join("*.ERB").to_str().unwrap(),
         MatchOptions {
             case_sensitive: false,
             ..Default::default()
@@ -142,11 +150,17 @@ fn replace() {
                 vec![(0, "처녀".into())].into_iter().collect(),
             ),
         ]
-            .into_iter()
-            .collect(),
+        .into_iter()
+        .collect(),
     };
 
-    assert_eq!(VAR_REGEX.replace_all("ABL:TARGET:0", &csv), "ABL:TARGET:C감각");
-    assert_eq!(VAR_REGEX.replace_all("ABL:TARGET:01", &csv), "ABL:TARGET:V감각");
+    assert_eq!(
+        VAR_REGEX.replace_all("ABL:TARGET:0", &csv),
+        "ABL:TARGET:C감각"
+    );
+    assert_eq!(
+        VAR_REGEX.replace_all("ABL:TARGET:01", &csv),
+        "ABL:TARGET:V감각"
+    );
     assert_eq!(VAR_REGEX.replace_all("TALENT:2:0", &csv), "TALENT:2:처녀");
 }
