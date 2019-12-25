@@ -5,11 +5,12 @@ use regex::{Captures, Regex, Replacer};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
+use rayon::prelude::*;
 
 fn is_need_csv(name: &str) -> bool {
     match name {
         "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "NOWEX" | "PALAM" | "SOURCE"
-        | "STAIN" | "STR" | "TALENT" | "TCVAR" => true,
+        | "STAIN" | "TALENT" | "TCVAR" | "STR" => true,
         _ => false,
     }
 }
@@ -70,25 +71,30 @@ pub struct CsvInfo {
 
 impl CsvInfo {
     pub fn new(path: &Path) -> Result<Self> {
-        let mut dic = HashMap::new();
-        for csv in glob::glob_with(
+        let files = glob::glob_with(
             path.join("CSV").join("*.CSV").to_str().unwrap(),
             MatchOptions {
                 case_sensitive: false,
                 ..Default::default()
             },
-        )? {
-            let csv = csv?;
-            let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
-            log::debug!("Read csv {}, name: {}", csv.display(), name);
+        )?
+            .filter_map(|csv| {
+            csv.ok().and_then(|csv| {
+                let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
 
-            if is_need_csv(&name) {
-                log::debug!("{} Is needed csv", name);
-                dic.insert(name, parse_csv(&csv)?);
-            }
-        }
+                if is_need_csv(&name) {
+                    Some((name, csv))
+                } else {
+                    None
+                }
+            })
+        }).collect::<Vec<_>>();
 
-        log::debug!("dic: {:?}", dic);
+        let dic = files.into_par_iter()
+            .filter_map(|(name, csv)| {
+                parse_csv(&csv).ok().map(|info| (name, info))
+            })
+            .collect();
 
         Ok(Self { dic })
     }
@@ -135,16 +141,22 @@ pub fn convert(path: &Path) -> Result<()> {
     log::debug!("Start in {:?}", path);
     let csv = CsvInfo::new(path)?;
 
-    for erb in glob::glob_with(
+    let erb_files= glob::glob_with(
         path.join("ERB").join("**").join("*.ERB").to_str().unwrap(),
         MatchOptions {
             case_sensitive: false,
             ..Default::default()
         },
-    )? {
-        let erb = erb?;
-        convert_erb(&erb, &csv)?;
-    }
+    )?.filter_map(|erb| {
+        erb.ok()
+    }).collect::<Vec<_>>();
+
+    erb_files.into_par_iter()
+        .for_each_with(&csv, |csv, erb| {
+            if let Err(err) = convert_erb(&erb, &csv) {
+                log::error!("convert erb {} failed: {:?}", erb.display(), err);
+            }
+        });
 
     Ok(())
 }
@@ -160,6 +172,12 @@ fn replace() {
                     .collect(),
             ),
             (
+                "BASE".into(),
+                vec![(0, "체력".into()), (1, "기력".into())]
+                    .into_iter()
+                    .collect(),
+            ),
+            (
                 "TALENT".into(),
                 vec![(0, "처녀".into())].into_iter().collect(),
             ),
@@ -171,6 +189,10 @@ fn replace() {
     assert_eq!(
         VAR_REGEX.replace_all("ABL:TARGET:0", &csv),
         "ABL:TARGET:C감각"
+    );
+    assert_eq!(
+        VAR_REGEX.replace_all("@BASERATIO(ARG, ARG:1, ARG:2)", &csv),
+        "@BASERATIO(ARG, ARG:1, ARG:2)"
     );
     assert_eq!(
         VAR_REGEX.replace_all("ABL:TARGET:01", &csv),
