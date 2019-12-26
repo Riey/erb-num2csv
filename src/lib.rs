@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 fn is_need_csv(name: &str) -> bool {
     match name {
-        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "NOWEX" | "PALAM" | "SOURCE"
+        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE"
         | "STAIN" | "TALENT" | "TCVAR" | "STR" => true,
         _ => false,
     }
@@ -117,7 +117,8 @@ impl<'a> Replacer for &'a CsvInfo {
         let var = caps.get(1).unwrap();
         match self.dic.get(match var.as_str() {
             "EXPLV" => "EXP",
-            "PALAMLV" => "PALAM",
+            "PALAM" | "PALAMLV" => "JUEL",
+            "NOWEX" => "EX",
             "UP" | "DOWM" => "SOURCE",
             "UPBASE" | "DOWNBASE" => "BASE",
             var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
