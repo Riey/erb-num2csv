@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 fn is_need_csv(name: &str) -> bool {
     match name {
-        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE"
-        | "STAIN" | "TALENT" | "TCVAR" | "STR" => true,
+        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT"
+        | "TCVAR" | "STR" => true,
         _ => false,
     }
 }
@@ -87,22 +87,20 @@ impl CsvInfo {
                 ..Default::default()
             },
         )?
-        .filter_map(|csv| {
-            csv.ok().and_then(|csv| {
-                let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
-
-                if is_need_csv(&name) {
-                    Some((name, csv))
-                } else {
-                    None
-                }
-            })
-        })
+        .filter_map(|csv| csv.ok())
         .collect::<Vec<_>>();
 
         let dic = files
             .into_par_iter()
-            .filter_map(|(name, csv)| parse_csv(&csv).ok().map(|info| (name, info)))
+            .filter_map(|csv| {
+                let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
+
+                if !is_need_csv(&name) {
+                    None
+                } else {
+                    parse_csv(&csv).ok().map(|info| (name, info))
+                }
+            })
             .collect();
 
         Ok(Self { dic })
