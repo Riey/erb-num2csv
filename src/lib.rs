@@ -141,7 +141,7 @@ impl<'a> Replacer for &'a CsvInfo {
 }
 
 static VAR_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new("([^(){\\[%: ]+)(:[^ :]+)?:(\\d+)").unwrap());
+    Lazy::new(|| Regex::new("([^(){\\[%: \\n]+)(:[^ (){\\n:]+)?:(\\d+)").unwrap());
 static USELESS_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new("%(ABL|TALENT|EXP|MARK|PALAM)NAME:([^\\d]+?)%").unwrap());
 
