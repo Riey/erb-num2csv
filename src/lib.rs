@@ -114,8 +114,7 @@ impl<'a> Replacer for &'a CsvInfo {
         let all = all.as_str();
         let var = caps.get(1).unwrap();
         match self.dic.get(match var.as_str() {
-            "EXPLV" => "EXP",
-            "PALAM" | "PALAMLV" | "UP" | "DOWN" => "JUEL",
+            "PALAM" | "UP" | "DOWN" => "JUEL",
             "NOWEX" => "EX",
             "UPBASE" | "DOWNBASE" => "BASE",
             var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
