@@ -3,6 +3,7 @@ use conquer_once::Lazy;
 use glob::MatchOptions;
 use rayon::prelude::*;
 use regex::{Captures, Regex, Replacer};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
@@ -19,12 +20,25 @@ pub struct Opt {
     includes: Vec<String>,
     #[structopt(short)]
     excludes: Vec<String>,
-    //#[structopt(long)]
-    //regex_path: Option<PathBuf>,
+    #[structopt(long)]
+    erb_regex_path: Option<PathBuf>,
     #[structopt(short)]
     target: PathBuf,
     //#[structopt(long)]
     //normalize: bool,
+}
+
+#[derive(Deserialize)]
+struct RegexPat {
+    #[serde(with = "serde_regex")]
+    regex: Regex,
+    replace: String,
+}
+
+#[derive(Default, Deserialize)]
+pub struct ErbRegex {
+    #[serde(flatten)]
+    regex: Vec<RegexPat>,
 }
 
 fn is_need_csv(name: &str, opt: &Opt) -> bool {
@@ -38,7 +52,7 @@ fn is_need_csv(name: &str, opt: &Opt) -> bool {
 
     match name {
         "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT"
-        | "TCVAR" | "STR" => true,
+        | "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" => true,
         _ => false,
     }
 }
@@ -174,10 +188,8 @@ impl<'a> Replacer for &'a CsvInfo {
 
 static VAR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new("([^(){\\[%: \\n]+)(:[^ (){\\n:]+)?:(\\d+)").unwrap());
-static USELESS_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new("%(ABL|TALENT|EXP|MARK|PALAM)NAME:([^\\d]+?)%").unwrap());
 
-pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
+pub fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
     let mut file = BufReader::with_capacity(8196, File::open(path)?);
 
@@ -187,8 +199,14 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     }
     let erb = std::fs::read_to_string(path)?;
 
-    let ret = VAR_REGEX.replace_all(&erb, csv);
-    let ret = USELESS_NAME.replace_all(ret.as_ref(), "$2");
+    let mut ret: String = VAR_REGEX.replace_all(&erb, csv).to_string();
+
+    for regex in regex.regex.iter() {
+        ret = regex
+            .regex
+            .replace_all(&ret, regex.replace.as_str())
+            .to_string();
+    }
 
     let mut file = BufWriter::with_capacity(8196, File::create(path)?);
     file.write_all(&BOM)?;
@@ -204,9 +222,13 @@ pub fn convert(opt: &Opt) -> Result<()> {
     erb_path.push("*.ERB");
 
     let erb_files = list_files(&erb_path);
+    let regex = match &opt.erb_regex_path {
+        Some(path) => serde_yaml::from_reader(File::open(path)?)?,
+        None => ErbRegex::default(),
+    };
 
-    erb_files.into_par_iter().for_each_with(&csv, |csv, erb| {
-        if let Err(err) = convert_erb(&erb, &csv) {
+    erb_files.into_par_iter().for_each(|erb| {
+        if let Err(err) = convert_erb(&erb, &csv, &regex) {
             log::error!("convert erb {} failed: {:?}", erb.display(), err);
         }
     });
