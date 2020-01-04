@@ -7,8 +7,35 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 
-fn is_need_csv(name: &str) -> bool {
+#[derive(StructOpt)]
+#[structopt(
+    name = "erb-num2csv",
+    about = "Convert erb variable number to csv name"
+)]
+pub struct Opt {
+    #[structopt(short)]
+    includes: Vec<String>,
+    #[structopt(short)]
+    excludes: Vec<String>,
+    //#[structopt(long)]
+    //regex_path: Option<PathBuf>,
+    #[structopt(short)]
+    target: PathBuf,
+    //#[structopt(long)]
+    //normalize: bool,
+}
+
+fn is_need_csv(name: &str, opt: &Opt) -> bool {
+    if opt.includes.iter().any(|n| n == name) {
+        return true;
+    }
+
+    if opt.excludes.iter().any(|n| n == name) {
+        return false;
+    }
+
     match name {
         "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT"
         | "TCVAR" | "STR" => true,
@@ -22,6 +49,19 @@ fn check_bom(r: &mut impl Read) -> Result<bool> {
     let mut buf = [0u8; BOM.len()];
     r.read_exact(&mut buf)?;
     Ok(buf == BOM)
+}
+
+fn list_files(path: &Path) -> Vec<PathBuf> {
+    glob::glob_with(
+        path.to_str().unwrap(),
+        MatchOptions {
+            case_sensitive: false,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .filter_map(Result::ok)
+    .collect()
 }
 
 fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
@@ -79,23 +119,17 @@ pub struct CsvInfo {
 }
 
 impl CsvInfo {
-    pub fn new(path: &Path) -> Result<Self> {
-        let files = glob::glob_with(
-            path.join("CSV").join("*.CSV").to_str().unwrap(),
-            MatchOptions {
-                case_sensitive: false,
-                ..Default::default()
-            },
-        )?
-        .filter_map(|csv| csv.ok())
-        .collect::<Vec<_>>();
+    pub fn new(opt: &Opt) -> Result<Self> {
+        let mut path = opt.target.join("CSV");
+        path.push("*.CSV");
+        let files = list_files(&path);
 
         let dic = files
             .into_par_iter()
             .filter_map(|csv| {
                 let name = csv.file_stem().unwrap().to_str().unwrap().to_uppercase();
 
-                if !is_need_csv(&name) {
+                if !is_need_csv(&name, opt) {
                     None
                 } else {
                     parse_csv(&csv).ok().map(|info| (name, info))
@@ -162,19 +196,14 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo) -> Result<()> {
     Ok(())
 }
 
-pub fn convert(path: &Path) -> Result<()> {
-    log::debug!("Start in {:?}", path);
-    let csv = CsvInfo::new(path)?;
+pub fn convert(opt: &Opt) -> Result<()> {
+    log::debug!("Start in {:?}", opt.target);
+    let csv = CsvInfo::new(opt)?;
+    let mut erb_path = opt.target.join("ERB");
+    erb_path.push("**");
+    erb_path.push("*.ERB");
 
-    let erb_files = glob::glob_with(
-        path.join("ERB").join("**").join("*.ERB").to_str().unwrap(),
-        MatchOptions {
-            case_sensitive: false,
-            ..Default::default()
-        },
-    )?
-    .filter_map(|erb| erb.ok())
-    .collect::<Vec<_>>();
+    let erb_files = list_files(&erb_path);
 
     erb_files.into_par_iter().for_each_with(&csv, |csv, erb| {
         if let Err(err) = convert_erb(&erb, &csv) {

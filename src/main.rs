@@ -1,9 +1,8 @@
 use anyhow::Result;
-use erb_num2csv::convert;
-use std::env::args;
-use std::path::Path;
+use erb_num2csv::{convert, Opt};
+use structopt::StructOpt;
 
 fn main() -> Result<()> {
     env_logger::init();
-    convert(Path::new(&args().skip(1).next().unwrap()))
+    convert(&Opt::from_args())
 }
