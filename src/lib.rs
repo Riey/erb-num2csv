@@ -256,6 +256,11 @@ pub fn convert(opt: &Opt) -> Result<()> {
 }
 
 #[test]
+fn normalize_test() {
+    assert_eq!("쾌A", normalize_name("쾌Ａ"));
+}
+
+#[test]
 fn replace() {
     let csv = CsvInfo {
         dic: vec![
