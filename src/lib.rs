@@ -26,6 +26,8 @@ pub struct Opt {
     target: PathBuf,
     #[structopt(long)]
     normalize: bool,
+    #[structopt(long)]
+    explict_target: bool,
 }
 
 #[derive(Deserialize)]
@@ -149,6 +151,7 @@ fn parse_csv(path: &PathBuf, normalize: bool) -> Result<HashMap<u32, String>> {
 
 pub struct CsvInfo {
     dic: HashMap<String, HashMap<u32, String>>,
+    explict_target: bool,
 }
 
 impl CsvInfo {
@@ -170,14 +173,13 @@ impl CsvInfo {
             })
             .collect();
 
-        Ok(Self { dic })
+        Ok(Self { dic, explict_target: opt.explict_target })
     }
 }
 
 impl<'a> Replacer for &'a CsvInfo {
     fn replace_append(&mut self, caps: &Captures, dst: &mut String) {
         let all = caps.get(0).unwrap();
-        let start = all.start();
         let all = all.as_str();
         let var = caps.get(1).unwrap();
         match self.dic.get(match var.as_str() {
@@ -188,8 +190,18 @@ impl<'a> Replacer for &'a CsvInfo {
             var => var,
         }) {
             Some(dic) => {
+                dst.push_str(var.as_str());
+                match caps.get(2) {
+                    Some(chara_idx) => {
+                        dst.push_str(chara_idx.as_str());
+                    }
+                    None if self.explict_target => {
+                        dst.push_str(":TARGET");
+                    }
+                    None => {}
+                }
+                dst.push(':');
                 let idx = caps.get(3).unwrap();
-                dst.push_str(&all[..idx.start() - start]);
                 let idx = idx.as_str();
                 dst.push_str(
                     dic.get(&idx.parse().unwrap())
