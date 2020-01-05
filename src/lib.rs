@@ -35,11 +35,7 @@ struct RegexPat {
     replace: String,
 }
 
-#[derive(Default, Deserialize)]
-pub struct ErbRegex {
-    #[serde(flatten)]
-    regex: Vec<RegexPat>,
-}
+type ErbRegex = Vec<RegexPat>;
 
 fn is_need_csv(name: &str, opt: &Opt) -> bool {
     if opt.includes.iter().any(|n| n == name) {
@@ -212,7 +208,7 @@ impl<'a> Replacer for &'a CsvInfo {
 static VAR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new("([^(){\\[%: \\n]+)(:[^ (){\\n:]+)?:(\\d+)").unwrap());
 
-pub fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
+fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
     log::debug!("Start convert erb path: {}", path.display());
     let mut file = BufReader::with_capacity(8196, File::open(path)?);
 
@@ -224,7 +220,7 @@ pub fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
 
     let mut ret: String = VAR_REGEX.replace_all(&erb, csv).to_string();
 
-    for regex in regex.regex.iter() {
+    for regex in regex.iter() {
         ret = regex
             .regex
             .replace_all(&ret, regex.replace.as_str())
