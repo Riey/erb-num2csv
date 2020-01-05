@@ -48,7 +48,7 @@ fn is_need_csv(name: &str, opt: &Opt) -> bool {
 
     match name {
         "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT"
-        | "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" => true,
+        | "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
         _ => false,
     }
 }
@@ -196,7 +196,6 @@ impl<'a> Replacer for &'a CsvInfo {
                         .map(|v| v.as_str())
                         .unwrap_or(idx),
                 );
-                log::debug!("all: {}, var: [{}]", all, var.as_str());
             }
             None => {
                 dst.push_str(all);
@@ -209,7 +208,6 @@ static VAR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new("([^(){\\[%: \\n]+)(:[^ (){\\n:]+)?:(\\d+)").unwrap());
 
 fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
-    log::debug!("Start convert erb path: {}", path.display());
     let mut file = BufReader::with_capacity(8196, File::open(path)?);
 
     if !check_bom(&mut file)? {
