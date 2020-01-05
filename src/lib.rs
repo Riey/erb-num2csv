@@ -24,8 +24,8 @@ pub struct Opt {
     erb_regex_path: Option<PathBuf>,
     #[structopt(short)]
     target: PathBuf,
-    //#[structopt(long)]
-    //normalize: bool,
+    #[structopt(long)]
+    normalize: bool,
 }
 
 #[derive(Deserialize)]
@@ -78,7 +78,26 @@ fn list_files(path: &Path) -> Vec<PathBuf> {
     .collect()
 }
 
-fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
+fn normalize_name(name: &str) -> String {
+    let mut ret = String::with_capacity(name.len());
+
+    for c in name.chars() {
+        if let Some(c) = unicode_hfwidth::to_halfwidth(c) {
+            ret.push(c);
+        } else {
+            match c {
+                ' ' => ret.push('_'),
+                ')' => {}
+                '(' => ret.push_str("__"),
+                c => ret.push(c),
+            }
+        }
+    }
+
+    ret
+}
+
+fn parse_csv(path: &PathBuf, normalize: bool) -> Result<HashMap<u32, String>> {
     let mut ret = HashMap::new();
 
     let file = std::fs::File::open(path)?;
@@ -97,7 +116,6 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
             break;
         }
         let mut line = buf.trim();
-        log::debug!("line: [{}]", line);
 
         match line.find(';') {
             Some(comment) => line = line.split_at(comment).0,
@@ -110,9 +128,7 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
         }
 
         let at = line.find(',').unwrap();
-        log::debug!("line: [{}]", line);
         let (num, name) = line.split_at(at);
-        log::debug!("num: [{}]", num);
 
         let mut name = &name[1..];
 
@@ -121,7 +137,14 @@ fn parse_csv(path: &PathBuf) -> Result<HashMap<u32, String>> {
             _ => {}
         }
 
-        ret.insert(num.parse()?, name.into());
+        ret.insert(
+            num.parse()?,
+            if normalize {
+                normalize_name(name)
+            } else {
+                name.into()
+            },
+        );
         buf.clear();
     }
 
@@ -146,7 +169,7 @@ impl CsvInfo {
                 if !is_need_csv(&name, opt) {
                     None
                 } else {
-                    parse_csv(&csv).ok().map(|info| (name, info))
+                    parse_csv(&csv, opt.normalize).ok().map(|info| (name, info))
                 }
             })
             .collect();

@@ -18,3 +18,4 @@ structopt = "0.3.7"
 serde_regex = "0.4.0"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_yaml = "0.8.11"
+unicode_hfwidth = "0.2.0"
