@@ -220,15 +220,18 @@ static VAR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new("([^(){\\[%: \\n]+)(:[^ (){\\n:]+)?:(\\d+)").unwrap());
 
 fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
-    let mut file = BufReader::with_capacity(8196, File::open(path)?);
+    let mut file = File::open(path)?;
 
     if !check_bom(&mut file)? {
         log::warn!("Can't find BOM in {} skip it", path.display());
         return Ok(());
     }
-    let erb = std::fs::read_to_string(path)?;
 
-    let mut ret: String = VAR_REGEX.replace_all(&erb, csv).to_string();
+    let mut erb = String::with_capacity(path.metadata()?.len() as usize);
+    let len = file.read_to_string(&mut erb)?;
+    let erb = &erb[..len];
+
+    let mut ret: String = VAR_REGEX.replace_all(erb, csv).to_string();
 
     for regex in regex.iter() {
         ret = regex
