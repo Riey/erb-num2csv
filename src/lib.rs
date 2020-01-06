@@ -41,7 +41,7 @@ type ErbRegex = Vec<RegexPat>;
 
 fn is_chara_csv(name: &str) -> bool {
     match name {
-        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT" | "CSTR" | "EQUIP" => true,
+        "ABL" | "BASE" | "CFLAG" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT" | "CSTR" | "EQUIP" => true,
         _ => false,
     }
 }
@@ -308,10 +308,11 @@ fn replace() {
         ]
         .into_iter()
         .collect(),
+        explict_target: true,
     };
 
     assert_eq!(
-        VAR_REGEX.replace_all("ABL:TARGET:0", &csv),
+        VAR_REGEX.replace_all("ABL:0", &csv),
         "ABL:TARGET:C감각"
     );
     assert_eq!(
