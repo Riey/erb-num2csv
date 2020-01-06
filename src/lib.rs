@@ -4,6 +4,7 @@ use glob::MatchOptions;
 use rayon::prelude::*;
 use regex::{Captures, Regex, Replacer};
 use serde::Deserialize;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
@@ -41,12 +42,13 @@ type ErbRegex = Vec<RegexPat>;
 
 fn is_chara_csv(name: &str) -> bool {
     match name {
-        "ABL" | "BASE" | "CFLAG" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT" | "CSTR" | "EQUIP" => true,
+        "ABL" | "BASE" | "CFLAG" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN"
+        | "TALENT" | "CSTR" | "EQUIP" => true,
         _ => false,
     }
 }
 
-fn is_global_csv(name: &str) ->bool {
+fn is_global_csv(name: &str) -> bool {
     match name {
         "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
         _ => false,
@@ -246,10 +248,9 @@ fn convert_erb(path: &Path, csv: &CsvInfo, regex: &ErbRegex) -> Result<()> {
     let mut ret: String = VAR_REGEX.replace_all(erb, csv).to_string();
 
     for regex in regex.iter() {
-        ret = regex
-            .regex
-            .replace_all(&ret, regex.replace.as_str())
-            .to_string();
+        if let Cow::Owned(text) = regex.regex.replace_all(&ret, regex.replace.as_str()) {
+            ret = text;
+        }
     }
 
     let mut file = BufWriter::with_capacity(8196, File::create(path)?);
@@ -311,10 +312,7 @@ fn replace() {
         explict_target: true,
     };
 
-    assert_eq!(
-        VAR_REGEX.replace_all("ABL:0", &csv),
-        "ABL:TARGET:C감각"
-    );
+    assert_eq!(VAR_REGEX.replace_all("ABL:0", &csv), "ABL:TARGET:C감각");
     assert_eq!(
         VAR_REGEX.replace_all("@BASERATIO(ARG, ARG:1, ARG:2)", &csv),
         "@BASERATIO(ARG, ARG:1, ARG:2)"
