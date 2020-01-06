@@ -39,6 +39,20 @@ struct RegexPat {
 
 type ErbRegex = Vec<RegexPat>;
 
+fn is_chara_csv(name: &str) -> bool {
+    match name {
+        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT" | "CSTR" | "EQUIP" => true,
+        _ => false,
+    }
+}
+
+fn is_global_csv(name: &str) ->bool {
+    match name {
+        "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
+        _ => false,
+    }
+}
+
 fn is_need_csv(name: &str, opt: &Opt) -> bool {
     if opt.includes.iter().any(|n| n == name) {
         return true;
@@ -48,11 +62,7 @@ fn is_need_csv(name: &str, opt: &Opt) -> bool {
         return false;
     }
 
-    match name {
-        "ABL" | "BASE" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN" | "TALENT"
-        | "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
-        _ => false,
-    }
+    is_chara_csv(name) || is_global_csv(name)
 }
 
 const BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
@@ -84,8 +94,7 @@ fn normalize_name(name: &str) -> String {
             ret.push(c);
         } else {
             match c {
-                ' ' => ret.push('_'),
-                ')' => {}
+                ' ' | ')' => {}
                 '(' => ret.push_str("__"),
                 c => ret.push(c),
             }
@@ -173,7 +182,10 @@ impl CsvInfo {
             })
             .collect();
 
-        Ok(Self { dic, explict_target: opt.explict_target })
+        Ok(Self {
+            dic,
+            explict_target: opt.explict_target,
+        })
     }
 }
 
@@ -195,7 +207,7 @@ impl<'a> Replacer for &'a CsvInfo {
                     Some(chara_idx) => {
                         dst.push_str(chara_idx.as_str());
                     }
-                    None if self.explict_target => {
+                    None if self.explict_target && is_chara_csv(var.as_str()) => {
                         dst.push_str(":TARGET");
                     }
                     None => {}
