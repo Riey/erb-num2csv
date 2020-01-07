@@ -44,14 +44,14 @@ fn is_chara_csv(name: &str) -> bool {
     match name {
         "ABL" | "BASE" | "CFLAG" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN"
         | "TALENT" | "CSTR" | "EQUIP" | "PALAM" | "UP" | "DOWN" | "UPBASE" | "DOWNBASE"
-        | "NOWEX" => true,
+        | "NOWEX" | "TCVAR" => true,
         _ => false,
     }
 }
 
 fn is_global_csv(name: &str) -> bool {
     match name {
-        "TCVAR" | "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
+        "STR" | "FLAG" | "CFLAG" | "TFLAG" | "TEQUIP" => true,
         _ => false,
     }
 }
