@@ -196,20 +196,23 @@ impl<'a> Replacer for &'a CsvInfo {
         let all = caps.get(0).unwrap();
         let all = all.as_str();
         let var = caps.get(1).unwrap();
-        match self.dic.get(match var.as_str() {
+        let mut var = var.as_str();
+        if var.ends_with("NAME") {
+            var = var.split_at(var.len() - 4).0;
+        }
+        match self.dic.get(match var {
             "PALAM" | "UP" | "DOWN" => "JUEL",
             "NOWEX" => "EX",
             "UPBASE" | "DOWNBASE" => "BASE",
-            var if var.ends_with("NAME") => var.split_at(var.len() - 4).0,
             var => var,
         }) {
             Some(dic) => {
-                dst.push_str(var.as_str());
+                dst.push_str(var);
                 match caps.get(2) {
                     Some(chara_idx) => {
                         dst.push_str(chara_idx.as_str());
                     }
-                    None if self.explict_target && is_chara_csv(var.as_str()) => {
+                    None if self.explict_target && is_chara_csv(var) => {
                         dst.push_str(":TARGET");
                     }
                     None => {}
