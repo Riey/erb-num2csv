@@ -43,7 +43,8 @@ type ErbRegex = Vec<RegexPat>;
 fn is_chara_csv(name: &str) -> bool {
     match name {
         "ABL" | "BASE" | "CFLAG" | "EX" | "EXP" | "JUEL" | "MARK" | "SOURCE" | "STAIN"
-        | "TALENT" | "CSTR" | "EQUIP" | "PALAM" => true,
+        | "TALENT" | "CSTR" | "EQUIP" | "PALAM" | "UP" | "DOWN" | "UPBASE" | "DOWNBASE"
+        | "NOWEX" => true,
         _ => false,
     }
 }
